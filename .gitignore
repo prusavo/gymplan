@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.env
+*.tsbuildinfo
+
+# Expo
+packages/mobile/.expo/
+packages/mobile/android/
+packages/mobile/ios/
+
+# Docker volumes
+pgdata/
+miniodata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "GymPlan",
+    "slug": "gymplan",
+    "version": "1.0.0",
+    "scheme": "gymplan",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#121212",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-haptics",
+      "expo-keep-awake",
+      "expo-image-picker"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.gymplan.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#121212"
+      },
+      "package": "com.gymplan.app"
+    }
+  }
+}
