@@ -24,7 +24,7 @@ export default function ProgressScreen() {
 
   const exercisesQuery = trpc.exercise.list.useQuery({
     limit: 100,
-    offset: 0,
+    cursor: 0,
   });
   const exercises = exercisesQuery.data?.exercises ?? [];
 

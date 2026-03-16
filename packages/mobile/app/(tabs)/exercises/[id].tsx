@@ -24,6 +24,7 @@ export default function ExerciseDetailScreen() {
       utils.exercise.list.invalidate();
       router.back();
     },
+    onError: (err) => Alert.alert("Error", err.message),
   });
 
   if (exerciseQuery.isLoading) {

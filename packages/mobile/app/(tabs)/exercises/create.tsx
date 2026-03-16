@@ -39,7 +39,7 @@ export default function CreateExerciseScreen() {
       const ex = exerciseQuery.data;
       setName(ex.name);
       setDescription(ex.description ?? "");
-      setCategoryId(ex.categoryId);
+      setCategoryId(ex.categoryId ?? "");
       setCategoryName(ex.categoryName ?? "");
     }
   }, [exerciseQuery.data]);
@@ -49,6 +49,7 @@ export default function CreateExerciseScreen() {
       utils.exercise.list.invalidate();
       router.back();
     },
+    onError: (err) => Alert.alert("Error", err.message),
   });
 
   const updateMutation = trpc.exercise.update.useMutation({
@@ -57,6 +58,7 @@ export default function CreateExerciseScreen() {
       utils.exercise.getById.invalidate({ id: editId! });
       router.back();
     },
+    onError: (err) => Alert.alert("Error", err.message),
   });
 
   const handleSave = () => {

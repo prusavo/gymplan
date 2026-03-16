@@ -1,6 +1,6 @@
 # Phase 2: Exercise Library
 
-**Status**: TODO
+**Status**: DONE
 
 Build the exercise CRUD API and mobile screens so users can browse, create, edit, and delete exercises.
 
@@ -8,29 +8,29 @@ Build the exercise CRUD API and mobile screens so users can browse, create, edit
 
 ### API
 
-- [ ] **category.list router** -- Query that returns all categories sorted by `sortOrder`.
-- [ ] **exercise.list router** -- Query with optional `categoryId` filter, `search` text, pagination (`limit`/`offset`). Returns exercises + total count.
-- [ ] **exercise.getById router** -- Query returning exercise with images. 404 if not found or wrong user.
-- [ ] **exercise.create router** -- Mutation validating `createExerciseSchema`, inserting with current user's ID.
-- [ ] **exercise.update router** -- Mutation validating `updateExerciseSchema`, partial update. Ownership check.
-- [ ] **exercise.delete router** -- Mutation deleting exercise and cascaded images. Ownership check.
-- [ ] **exercise.getUploadUrl router** -- Mutation generating presigned S3 URL for image upload.
+- [x] **category.list router** -- Query that returns all categories sorted by `sortOrder`.
+- [x] **exercise.list router** -- Query with optional `categoryId` filter, `search` text, pagination (`limit`/`cursor`). Returns exercises + total count.
+- [x] **exercise.getById router** -- Query returning exercise with images and category name. 404 if not found or wrong user.
+- [x] **exercise.create router** -- Mutation validating `createExerciseSchema`, inserting with current user's ID.
+- [x] **exercise.update router** -- Mutation validating `updateExerciseSchema`, partial update. Ownership check.
+- [x] **exercise.delete router** -- Mutation deleting exercise and cascaded images. Ownership check.
+- [x] **exercise.getUploadUrl router** -- Mutation generating presigned S3 URL for image upload.
 
 ### Mobile
 
-- [ ] **Exercise list screen** -- FlatList showing exercises grouped or filtered by category. Pull-to-refresh.
-- [ ] **Category filter bar** -- Horizontal scrollable category chips. Tapping a chip filters the list.
-- [ ] **Search bar** -- Text input that filters exercises by name (debounced).
-- [ ] **Exercise detail screen** -- Shows name, description, category, images. Edit and delete buttons.
-- [ ] **Create exercise form** -- Name input, description textarea, category picker. Validation feedback.
-- [ ] **Edit exercise form** -- Pre-populated form, same layout as create.
-- [ ] **Delete confirmation** -- Alert dialog before deletion.
+- [x] **Exercise list screen** -- FlatList showing exercises grouped or filtered by category. Pull-to-refresh. Infinite scroll pagination.
+- [x] **Category filter bar** -- Horizontal scrollable category chips. Tapping a chip filters the list.
+- [x] **Search bar** -- Text input that filters exercises by name (debounced 300ms). Clear button.
+- [x] **Exercise detail screen** -- Shows name, description, category, images. Edit and delete buttons.
+- [x] **Create exercise form** -- Name input, description textarea, category picker. Validation feedback.
+- [x] **Edit exercise form** -- Pre-populated form, same layout as create.
+- [x] **Delete confirmation** -- Alert dialog before deletion.
 
 ### Integration
 
-- [ ] **Wire tRPC calls** -- Connect all screens to the corresponding API procedures via tRPC client.
-- [ ] **Loading states** -- Skeleton or spinner for list and detail screens.
-- [ ] **Error handling** -- Toast or inline error for failed API calls.
+- [x] **Wire tRPC calls** -- Connect all screens to the corresponding API procedures via tRPC client.
+- [x] **Loading states** -- Skeleton or spinner for list and detail screens. Pagination footer spinner.
+- [x] **Error handling** -- Alert for failed API calls on create, update, and delete mutations.
 
 ## Acceptance Criteria
 

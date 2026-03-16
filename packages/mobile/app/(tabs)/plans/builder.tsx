@@ -52,7 +52,7 @@ export default function PlanBuilderScreen() {
   const exercisesQuery = trpc.exercise.list.useQuery({
     search: exerciseSearch || undefined,
     limit: 50,
-    offset: 0,
+    cursor: 0,
   });
 
   const availableExercises = exercisesQuery.data?.exercises ?? [];

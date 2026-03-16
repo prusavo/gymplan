@@ -10,6 +10,10 @@ import { router, protectedProcedure } from "../middleware/auth.js";
 import { exercise, exerciseImage, category } from "../db/schema.js";
 import { getPresignedUploadUrl } from "../services/s3.js";
 
+function escapeLike(str: string): string {
+  return str.replace(/[%_\\]/g, "\\$&");
+}
+
 export const exerciseRouter = router({
   list: protectedProcedure
     .input(exerciseListQuerySchema)
@@ -20,10 +24,42 @@ export const exerciseRouter = router({
         conditions.push(eq(exercise.categoryId, input.categoryId));
       }
       if (input.search) {
-        conditions.push(ilike(exercise.name, `%${input.search}%`));
+        conditions.push(ilike(exercise.name, `%${escapeLike(input.search)}%`));
       }
 
-      const rows = await ctx.db
+      const whereClause = and(...conditions);
+
+      const [rows, countResult] = await Promise.all([
+        ctx.db
+          .select({
+            id: exercise.id,
+            userId: exercise.userId,
+            name: exercise.name,
+            description: exercise.description,
+            categoryId: exercise.categoryId,
+            categoryName: category.name,
+            createdAt: exercise.createdAt,
+            updatedAt: exercise.updatedAt,
+          })
+          .from(exercise)
+          .leftJoin(category, eq(exercise.categoryId, category.id))
+          .where(whereClause)
+          .limit(input.limit)
+          .offset(input.cursor)
+          .orderBy(exercise.name),
+        ctx.db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(exercise)
+          .where(whereClause),
+      ]);
+
+      return { exercises: rows, total: countResult[0]?.count ?? 0 };
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [row] = await ctx.db
         .select({
           id: exercise.id,
           userId: exercise.userId,
@@ -36,26 +72,12 @@ export const exerciseRouter = router({
         })
         .from(exercise)
         .leftJoin(category, eq(exercise.categoryId, category.id))
-        .where(and(...conditions))
-        .limit(input.limit)
-        .offset(input.offset)
-        .orderBy(exercise.name);
-
-      return rows;
-    }),
-
-  getById: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
-      const [ex] = await ctx.db
-        .select()
-        .from(exercise)
         .where(
           and(eq(exercise.id, input.id), eq(exercise.userId, ctx.user.id))
         )
         .limit(1);
 
-      if (!ex) {
+      if (!row) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Exercise not found" });
       }
 
@@ -65,7 +87,7 @@ export const exerciseRouter = router({
         .where(eq(exerciseImage.exerciseId, input.id))
         .orderBy(exerciseImage.sortOrder);
 
-      return { ...ex, images };
+      return { ...row, images };
     }),
 
   create: protectedProcedure
@@ -87,21 +109,6 @@ export const exerciseRouter = router({
   update: protectedProcedure
     .input(updateExerciseSchema)
     .mutation(async ({ ctx, input }) => {
-      const [existing] = await ctx.db
-        .select()
-        .from(exercise)
-        .where(
-          and(eq(exercise.id, input.id), eq(exercise.userId, ctx.user.id))
-        )
-        .limit(1);
-
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Exercise not found or not owned by you",
-        });
-      }
-
       const updates: Record<string, unknown> = {
         updatedAt: new Date(),
       };
@@ -109,11 +116,23 @@ export const exerciseRouter = router({
       if (input.description !== undefined) updates.description = input.description;
       if (input.categoryId !== undefined) updates.categoryId = input.categoryId;
 
+      const ownershipClause = and(
+        eq(exercise.id, input.id),
+        eq(exercise.userId, ctx.user.id)
+      );
+
       const [updated] = await ctx.db
         .update(exercise)
         .set(updates)
-        .where(eq(exercise.id, input.id))
+        .where(ownershipClause)
         .returning();
+
+      if (!updated) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Exercise not found or not owned by you",
+        });
+      }
 
       return updated;
     }),
@@ -121,22 +140,22 @@ export const exerciseRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [existing] = await ctx.db
-        .select()
-        .from(exercise)
-        .where(
-          and(eq(exercise.id, input.id), eq(exercise.userId, ctx.user.id))
-        )
-        .limit(1);
+      const ownershipClause = and(
+        eq(exercise.id, input.id),
+        eq(exercise.userId, ctx.user.id)
+      );
 
-      if (!existing) {
+      const [deleted] = await ctx.db
+        .delete(exercise)
+        .where(ownershipClause)
+        .returning({ id: exercise.id });
+
+      if (!deleted) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Exercise not found or not owned by you",
         });
       }
-
-      await ctx.db.delete(exercise).where(eq(exercise.id, input.id));
 
       return { success: true };
     }),
@@ -145,8 +164,8 @@ export const exerciseRouter = router({
     .input(
       z.object({
         exerciseId: z.string().uuid(),
-        fileName: z.string().min(1),
-        contentType: z.string().min(1),
+        fileName: z.string().min(1).max(255).regex(/^[\w\-]+\.\w+$/),
+        contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
