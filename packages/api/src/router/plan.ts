@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import { createPlanSchema, updatePlanSchema } from "@gymplan/shared";
 import { router, protectedProcedure } from "../middleware/auth.js";
@@ -8,7 +8,17 @@ import { gymPlan, gymPlanExercise, exercise, category } from "../db/schema.js";
 export const planRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db
-      .select()
+      .select({
+        id: gymPlan.id,
+        userId: gymPlan.userId,
+        name: gymPlan.name,
+        createdAt: gymPlan.createdAt,
+        updatedAt: gymPlan.updatedAt,
+        exerciseCount: sql<number>`(
+          select count(*)::int from ${gymPlanExercise}
+          where ${gymPlanExercise.gymPlanId} = ${gymPlan.id}
+        )`.as("exerciseCount"),
+      })
       .from(gymPlan)
       .where(eq(gymPlan.userId, ctx.user.id))
       .orderBy(gymPlan.createdAt);

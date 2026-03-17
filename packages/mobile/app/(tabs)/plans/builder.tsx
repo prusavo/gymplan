@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Modal,
   FlatList,
   Pressable,
+  Animated,
 } from "react-native";
 import { router, useLocalSearchParams, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,6 +34,69 @@ interface PlanExerciseEntry {
   notes: string;
 }
 
+function useCardLongPress() {
+  const scale = useRef(new Animated.Value(1)).current;
+  const bgOpacity = useRef(new Animated.Value(0)).current;
+
+  const onLongPress = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1.03,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bgOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [scale, bgOpacity]);
+
+  const onPressOut = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bgOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [scale, bgOpacity]);
+
+  const backgroundColor = bgOpacity.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["transparent", colors.surfaceVariant],
+  });
+
+  return { scale, backgroundColor, onLongPress, onPressOut };
+}
+
+function AnimatedExerciseCard({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: any;
+}) {
+  const { scale, backgroundColor, onLongPress, onPressOut } =
+    useCardLongPress();
+
+  return (
+    <Pressable onLongPress={onLongPress} onPressOut={onPressOut} delayLongPress={200}>
+      <Animated.View
+        style={[
+          { transform: [{ scale }], backgroundColor, borderRadius: borderRadius.md },
+        ]}
+      >
+        <Card style={style}>{children}</Card>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function PlanBuilderScreen() {
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditing = !!editId;
@@ -41,6 +105,7 @@ export default function PlanBuilderScreen() {
   const [exercises, setExercises] = useState<PlanExerciseEntry[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -49,8 +114,12 @@ export default function PlanBuilderScreen() {
     { enabled: isEditing }
   );
 
+  const categoriesQuery = trpc.category.list.useQuery();
+  const categories = categoriesQuery.data ?? [];
+
   const exercisesQuery = trpc.exercise.list.useQuery({
     search: exerciseSearch || undefined,
+    categoryId: selectedCategory ?? undefined,
     limit: 50,
     cursor: 0,
   });
@@ -105,6 +174,7 @@ export default function PlanBuilderScreen() {
     ]);
     setShowExercisePicker(false);
     setExerciseSearch("");
+    setSelectedCategory(null);
   };
 
   const removeExercise = (index: number) => {
@@ -192,7 +262,7 @@ export default function PlanBuilderScreen() {
           <Text style={styles.sectionTitle}>Exercises</Text>
 
           {exercises.map((ex, index) => (
-            <Card key={ex.key} style={styles.exerciseEntry}>
+            <AnimatedExerciseCard key={ex.key} style={styles.exerciseEntry}>
               <View style={styles.exerciseHeader}>
                 <View style={styles.orderBadge}>
                   <Text style={styles.orderText}>{index + 1}</Text>
@@ -279,7 +349,7 @@ export default function PlanBuilderScreen() {
                   min={0}
                 />
               </View>
-            </Card>
+            </AnimatedExerciseCard>
           ))}
 
           <Button
@@ -301,11 +371,17 @@ export default function PlanBuilderScreen() {
           visible={showExercisePicker}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowExercisePicker(false)}
+          onRequestClose={() => {
+            setShowExercisePicker(false);
+            setSelectedCategory(null);
+          }}
         >
           <Pressable
             style={styles.modalOverlay}
-            onPress={() => setShowExercisePicker(false)}
+            onPress={() => {
+              setShowExercisePicker(false);
+              setSelectedCategory(null);
+            }}
           >
             <View
               style={styles.modalContent}
@@ -327,6 +403,51 @@ export default function PlanBuilderScreen() {
                   autoCorrect={false}
                 />
               </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipRow}
+              >
+                <Pressable
+                  style={[
+                    styles.chip,
+                    selectedCategory === null && styles.chipActive,
+                  ]}
+                  onPress={() => setSelectedCategory(null)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      selectedCategory === null && styles.chipTextActive,
+                    ]}
+                  >
+                    All
+                  </Text>
+                </Pressable>
+                {categories.map((cat: any) => (
+                  <Pressable
+                    key={cat.id}
+                    style={[
+                      styles.chip,
+                      selectedCategory === cat.id && styles.chipActive,
+                    ]}
+                    onPress={() =>
+                      setSelectedCategory(
+                        selectedCategory === cat.id ? null : cat.id
+                      )
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        selectedCategory === cat.id && styles.chipTextActive,
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
               <FlatList
                 data={availableExercises}
                 keyExtractor={(item: any) => item.id}
@@ -485,5 +606,26 @@ const styles = StyleSheet.create({
     color: colors.textDisabled,
     textAlign: "center",
     padding: spacing.lg,
+  },
+  chipRow: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceVariant,
+  },
+  chipActive: {
+    backgroundColor: colors.primary,
+  },
+  chipText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  chipTextActive: {
+    color: "#000000",
   },
 });

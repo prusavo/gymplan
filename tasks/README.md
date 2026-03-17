@@ -7,8 +7,8 @@ GymPlan development is organized into five sequential phases. Each phase builds 
 | Phase | Focus | Status |
 |---|---|---|
 | [Phase 1](phase-1-foundation.md) | Foundation (monorepo, DB, boilerplate) | DONE |
-| [Phase 2](phase-2-exercise-library.md) | Exercise Library (CRUD API + screens) | TODO |
-| [Phase 3](phase-3-plan-builder.md) | Plan Builder (plan CRUD + reorder) | TODO |
+| [Phase 2](phase-2-exercise-library.md) | Exercise Library (CRUD API + screens) | DONE |
+| [Phase 3](phase-3-plan-builder.md) | Plan Builder (plan CRUD + reorder) | DONE |
 | [Phase 4](phase-4-live-workout.md) | Live Workout (execution engine + UI) | TODO |
 | [Phase 5](phase-5-history-polish.md) | History, Progress, and Polish | TODO |
 

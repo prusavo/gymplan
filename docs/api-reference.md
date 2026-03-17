@@ -164,12 +164,12 @@ The client uploads the image directly to `uploadUrl` via PUT, then the `imageUrl
 
 ### plan.list
 
-List workout plans for the current user.
+List workout plans for the current user with exercise counts.
 
 - **Type**: query
 - **Auth**: required
 - **Input**: none
-- **Returns**: `Plan[]`
+- **Returns**: `(Plan & { exerciseCount: number })[]`
 
 ### plan.getById
 
