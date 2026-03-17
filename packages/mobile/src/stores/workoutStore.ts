@@ -44,12 +44,17 @@ interface WorkoutActions {
   startRest: (seconds: number) => void;
   endRest: () => void;
   nextExercise: () => void;
+  previousExercise: () => void;
+  goToExercise: (index: number) => void;
   completeWorkout: () => void;
   clearWorkout: () => void;
   resumeWorkout: () => void;
   getCurrentExerciseId: () => string | null;
   isWorkoutComplete: () => boolean;
   isExerciseComplete: () => boolean;
+  getRestSecondsForCurrentExercise: () => number;
+  getTotalSetsForExercise: (exerciseId: string) => number;
+  getCompletedSetsForExercise: (exerciseId: string) => number;
 }
 
 const initialState: WorkoutState = {
@@ -198,12 +203,54 @@ export const useWorkoutStore = create<WorkoutState & WorkoutActions>()(
         }
       },
 
+      previousExercise: () => {
+        const state = get();
+        if (state.currentExerciseIndex > 0) {
+          const prevIndex = state.currentExerciseIndex - 1;
+          const prevExerciseId = state.exerciseIds[prevIndex];
+          const prevTargetSets = prevExerciseId
+            ? state.targetSetsPerExercise[prevExerciseId] ?? 3
+            : 3;
+          const loggedSetsCount = state.sets.filter(
+            (s) => s.gymPlanExerciseId === prevExerciseId
+          ).length;
+          set({
+            currentExerciseIndex: prevIndex,
+            currentSetNumber: Math.min(loggedSetsCount + 1, prevTargetSets + 1),
+            isResting: false,
+            restEndTime: null,
+          });
+        }
+      },
+
+      goToExercise: (index: number) => {
+        const state = get();
+        if (index < 0 || index >= state.exerciseIds.length) return;
+        const exerciseId = state.exerciseIds[index];
+        const loggedSetsCount = state.sets.filter(
+          (s) => s.gymPlanExerciseId === exerciseId
+        ).length;
+        const targetSets = exerciseId
+          ? state.targetSetsPerExercise[exerciseId] ?? 3
+          : 3;
+        set({
+          currentExerciseIndex: index,
+          currentSetNumber: Math.min(loggedSetsCount + 1, targetSets + 1),
+          isResting: false,
+          restEndTime: null,
+        });
+      },
+
       completeWorkout: () => {
         set({ ...initialState });
+        // Explicitly remove persisted state from AsyncStorage on workout end
+        AsyncStorage.removeItem("gymplan-workout-store").catch(() => {});
       },
 
       clearWorkout: () => {
         set({ ...initialState });
+        // Explicitly remove persisted state from AsyncStorage on workout end
+        AsyncStorage.removeItem("gymplan-workout-store").catch(() => {});
       },
 
       resumeWorkout: () => {
@@ -239,6 +286,25 @@ export const useWorkoutStore = create<WorkoutState & WorkoutActions>()(
         const targetSets =
           state.targetSetsPerExercise[exerciseId] ?? 3;
         return state.currentSetNumber > targetSets;
+      },
+
+      getRestSecondsForCurrentExercise: () => {
+        const state = get();
+        const exerciseId = state.exerciseIds[state.currentExerciseIndex];
+        if (!exerciseId) return 90;
+        return state.restSecondsPerExercise[exerciseId] ?? 90;
+      },
+
+      getTotalSetsForExercise: (exerciseId: string) => {
+        const state = get();
+        return state.targetSetsPerExercise[exerciseId] ?? 3;
+      },
+
+      getCompletedSetsForExercise: (exerciseId: string) => {
+        const state = get();
+        return state.sets.filter(
+          (s) => s.gymPlanExerciseId === exerciseId
+        ).length;
       },
     }),
     {

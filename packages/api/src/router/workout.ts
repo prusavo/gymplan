@@ -20,6 +20,45 @@ export const workoutRouter = router({
   start: protectedProcedure
     .input(startWorkoutSchema)
     .mutation(async ({ ctx, input }) => {
+      // Reject if user already has an active workout
+      const [existing] = await ctx.db
+        .select({ id: gymPlanInstance.id })
+        .from(gymPlanInstance)
+        .where(
+          and(
+            eq(gymPlanInstance.userId, ctx.user.id),
+            eq(gymPlanInstance.status, "in_progress")
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "You already have an active workout. Complete or abandon it before starting a new one.",
+        });
+      }
+
+      // Verify the plan exists and belongs to the user
+      const [plan] = await ctx.db
+        .select({ id: gymPlan.id })
+        .from(gymPlan)
+        .where(
+          and(
+            eq(gymPlan.id, input.gymPlanId),
+            eq(gymPlan.userId, ctx.user.id)
+          )
+        )
+        .limit(1);
+
+      if (!plan) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Gym plan not found",
+        });
+      }
+
       const [instance] = await ctx.db
         .insert(gymPlanInstance)
         .values({
@@ -232,6 +271,25 @@ export const workoutRouter = router({
       return null;
     }
 
+    // Fetch all plan exercises with their targets and exercise details
+    const exercises = await ctx.db
+      .select({
+        id: gymPlanExercise.id,
+        exerciseId: gymPlanExercise.exerciseId,
+        sortOrder: gymPlanExercise.sortOrder,
+        targetSets: gymPlanExercise.targetSets,
+        targetReps: gymPlanExercise.targetReps,
+        restSeconds: gymPlanExercise.restSeconds,
+        notes: gymPlanExercise.notes,
+        exerciseName: exercise.name,
+        exerciseDescription: exercise.description,
+      })
+      .from(gymPlanExercise)
+      .leftJoin(exercise, eq(gymPlanExercise.exerciseId, exercise.id))
+      .where(eq(gymPlanExercise.gymPlanId, instance.gymPlanId!))
+      .orderBy(gymPlanExercise.sortOrder);
+
+    // Fetch all logged sets for this instance
     const sets = await ctx.db
       .select({
         id: instanceSet.id,
@@ -243,17 +301,11 @@ export const workoutRouter = router({
         completedAt: instanceSet.completedAt,
         skipped: instanceSet.skipped,
         notes: instanceSet.notes,
-        exerciseName: exercise.name,
       })
       .from(instanceSet)
-      .leftJoin(
-        gymPlanExercise,
-        eq(instanceSet.gymPlanExerciseId, gymPlanExercise.id)
-      )
-      .leftJoin(exercise, eq(gymPlanExercise.exerciseId, exercise.id))
       .where(eq(instanceSet.gymPlanInstanceId, instance.id))
       .orderBy(instanceSet.gymPlanExerciseId, instanceSet.setNumber);
 
-    return { ...instance, sets };
+    return { ...instance, exercises, sets };
   }),
 });

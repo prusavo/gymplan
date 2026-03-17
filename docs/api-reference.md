@@ -320,12 +320,57 @@ Abandon an in-progress workout. All logged sets are preserved.
 
 ### workout.getActive
 
-Get the current user's active (in_progress) workout, if any.
+Get the current user's active (in_progress) workout, if any. Returns the instance along with all plan exercises (with targets) and all logged sets.
 
 - **Type**: query
 - **Auth**: required
 - **Input**: none
-- **Returns**: `GymPlanInstance | null`
+- **Returns**: `ActiveWorkout | null`
+
+When an active workout exists, the response shape is:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `string` | Instance UUID |
+| `gymPlanId` | `string` | UUID of the plan |
+| `userId` | `string` | UUID of the owner |
+| `status` | `"in_progress"` | Always `in_progress` for this query |
+| `startedAt` | `string` | ISO datetime |
+| `completedAt` | `string?` | Always null for active workouts |
+| `notes` | `string?` | |
+| `planName` | `string?` | Name of the associated plan |
+| `exercises` | `PlanExerciseDetail[]` | Ordered by `sortOrder` |
+| `sets` | `InstanceSet[]` | Ordered by `gymPlanExerciseId`, `setNumber` |
+
+Each `exercises` entry:
+
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `exerciseId` | `string` |
+| `sortOrder` | `number` |
+| `targetSets` | `number` |
+| `targetReps` | `number` |
+| `restSeconds` | `number` |
+| `notes` | `string?` |
+| `exerciseName` | `string?` |
+| `exerciseDescription` | `string?` |
+
+Each `sets` entry:
+
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `gymPlanInstanceId` | `string` |
+| `gymPlanExerciseId` | `string` |
+| `setNumber` | `number` |
+| `weightKg` | `string?` |
+| `repsCompleted` | `number` |
+| `completedAt` | `string` |
+| `skipped` | `boolean` |
+| `notes` | `string?` |
+
+This endpoint is used by the crash recovery flow to verify that a locally persisted workout is still active on the server. See [Live Workout -- Crash Recovery](live-workout.md#crash-recovery).
 
 ---
 

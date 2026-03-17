@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, FlatList, StyleSheet } from "react-native";
+import { View, Text, FlatList, StyleSheet, Alert } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../../../src/theme";
@@ -9,16 +9,51 @@ import { LoadingScreen } from "../../../src/components/ui/LoadingScreen";
 import { EmptyState } from "../../../src/components/ui/EmptyState";
 import { trpc } from "../../../src/api/trpc";
 import { useWorkoutStore } from "../../../src/stores/workoutStore";
+import { useWorkoutRehydration } from "../../../src/hooks/useWorkoutRehydration";
 
 export default function WorkoutIndexScreen() {
   const activeInstanceId = useWorkoutStore((s) => s.activeInstanceId);
   const activePlanName = useWorkoutStore((s) => s.activePlanName);
   const resumeWorkout = useWorkoutStore((s) => s.resumeWorkout);
+  const clearWorkout = useWorkoutStore((s) => s.clearWorkout);
 
+  // Rehydrate persisted workout state against server on app open
+  const { isRehydrating } = useWorkoutRehydration();
+
+  const abandonMutation = trpc.workout.abandon.useMutation();
   const plansQuery = trpc.plan.list.useQuery();
   const plans = plansQuery.data ?? [];
 
+  // Show loading while rehydrating persisted workout state
+  if (isRehydrating) {
+    return <LoadingScreen />;
+  }
+
   if (activeInstanceId) {
+    const handleAbandon = () => {
+      Alert.alert(
+        "Abandon Workout",
+        "Are you sure? Your logged sets will be saved but the workout will be marked as abandoned.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Abandon",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await abandonMutation.mutateAsync({
+                  instanceId: activeInstanceId,
+                });
+              } catch {
+                // Continue clearing local state even if API fails
+              }
+              clearWorkout();
+            },
+          },
+        ]
+      );
+    };
+
     return (
       <View style={styles.container}>
         <View style={styles.resumeContainer}>
@@ -36,10 +71,9 @@ export default function WorkoutIndexScreen() {
           />
           <Button
             title="Abandon Workout"
-            onPress={() => {
-              useWorkoutStore.getState().clearWorkout();
-            }}
+            onPress={handleAbandon}
             variant="danger"
+            loading={abandonMutation.isPending}
           />
         </View>
       </View>
