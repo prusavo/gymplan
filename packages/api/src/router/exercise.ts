@@ -5,6 +5,8 @@ import {
   exerciseListQuerySchema,
   createExerciseSchema,
   updateExerciseSchema,
+  saveExerciseImageSchema,
+  deleteExerciseImageSchema,
 } from "@gymplan/shared";
 import { router, protectedProcedure } from "../middleware/auth.js";
 import { exercise, exerciseImage, category } from "../db/schema.js";
@@ -192,5 +194,84 @@ export const exerciseRouter = router({
       const publicUrl = `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET}/${key}`;
 
       return { uploadUrl, publicUrl, key };
+    }),
+
+  saveImage: protectedProcedure
+    .input(saveExerciseImageSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Verify exercise ownership
+      const [existing] = await ctx.db
+        .select({ id: exercise.id })
+        .from(exercise)
+        .where(
+          and(
+            eq(exercise.id, input.exerciseId),
+            eq(exercise.userId, ctx.user.id)
+          )
+        )
+        .limit(1);
+
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Exercise not found or not owned by you",
+        });
+      }
+
+      // Get max existing sortOrder
+      const [maxResult] = await ctx.db
+        .select({
+          maxSort: sql<number | null>`MAX(${exerciseImage.sortOrder})`.as(
+            "max_sort"
+          ),
+        })
+        .from(exerciseImage)
+        .where(eq(exerciseImage.exerciseId, input.exerciseId));
+
+      const nextSortOrder = (maxResult?.maxSort ?? -1) + 1;
+
+      const [created] = await ctx.db
+        .insert(exerciseImage)
+        .values({
+          exerciseId: input.exerciseId,
+          url: input.url,
+          sortOrder: nextSortOrder,
+        })
+        .returning();
+
+      return created;
+    }),
+
+  deleteImage: protectedProcedure
+    .input(deleteExerciseImageSchema)
+    .mutation(async ({ ctx, input }) => {
+      // Verify the image belongs to an exercise owned by the user
+      const [image] = await ctx.db
+        .select({
+          id: exerciseImage.id,
+          exerciseId: exerciseImage.exerciseId,
+        })
+        .from(exerciseImage)
+        .innerJoin(exercise, eq(exerciseImage.exerciseId, exercise.id))
+        .where(
+          and(
+            eq(exerciseImage.id, input.imageId),
+            eq(exercise.userId, ctx.user.id)
+          )
+        )
+        .limit(1);
+
+      if (!image) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Image not found or not owned by you",
+        });
+      }
+
+      await ctx.db
+        .delete(exerciseImage)
+        .where(eq(exerciseImage.id, input.imageId));
+
+      return { success: true };
     }),
 });

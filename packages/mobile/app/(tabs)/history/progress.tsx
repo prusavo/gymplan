@@ -7,12 +7,14 @@ import {
   Pressable,
   Modal,
   FlatList,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../../../src/theme";
 import { Card } from "../../../src/components/ui/Card";
 import { LoadingScreen } from "../../../src/components/ui/LoadingScreen";
 import { EmptyState } from "../../../src/components/ui/EmptyState";
+import { ErrorState } from "../../../src/components/ui/ErrorState";
 import { trpc } from "../../../src/api/trpc";
 
 export default function ProgressScreen() {
@@ -33,7 +35,8 @@ export default function ProgressScreen() {
     { enabled: !!selectedExerciseId }
   );
 
-  const historyData = progressQuery.data?.sets ?? [];
+  // API returns a flat array directly, not { sets: [...] }
+  const historyData: any[] = (progressQuery.data as any) ?? [];
 
   // Simple chart: show weight progression as bars
   const maxWeight = historyData.reduce(
@@ -41,8 +44,36 @@ export default function ProgressScreen() {
     0
   );
 
+  if (progressQuery.isError && selectedExerciseId) {
+    return (
+      <View style={styles.container}>
+        <ErrorState
+          message={progressQuery.error?.message}
+          onRetry={() => progressQuery.refetch()}
+        />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={
+            (!!selectedExerciseId && progressQuery.isRefetching) ||
+            exercisesQuery.isRefetching
+          }
+          onRefresh={() => {
+            exercisesQuery.refetch();
+            if (selectedExerciseId) progressQuery.refetch();
+          }}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
+    >
       <Pressable
         style={styles.exercisePicker}
         onPress={() => setShowPicker(true)}

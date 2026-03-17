@@ -43,8 +43,19 @@ export const exerciseListQuerySchema = z.object({
   cursor: z.number().int().min(0).default(0),
 });
 
+export const saveExerciseImageSchema = z.object({
+  exerciseId: z.string().uuid(),
+  url: z.string().url().max(500),
+});
+
+export const deleteExerciseImageSchema = z.object({
+  imageId: z.string().uuid(),
+});
+
 export type CreateExerciseInput = z.infer<typeof createExerciseSchema>;
 export type UpdateExerciseInput = z.infer<typeof updateExerciseSchema>;
 export type Exercise = z.infer<typeof exerciseSchema>;
 export type ExerciseImage = z.infer<typeof exerciseImageSchema>;
 export type ExerciseListQuery = z.infer<typeof exerciseListQuerySchema>;
+export type SaveExerciseImageInput = z.infer<typeof saveExerciseImageSchema>;
+export type DeleteExerciseImageInput = z.infer<typeof deleteExerciseImageSchema>;

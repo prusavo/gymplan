@@ -4,6 +4,7 @@ import { useLocalSearchParams, Stack } from "expo-router";
 import { colors, spacing, borderRadius, typography } from "../../../src/theme";
 import { Card } from "../../../src/components/ui/Card";
 import { LoadingScreen } from "../../../src/components/ui/LoadingScreen";
+import { ErrorState } from "../../../src/components/ui/ErrorState";
 import { trpc } from "../../../src/api/trpc";
 
 export default function WorkoutDetailScreen() {
@@ -13,6 +14,17 @@ export default function WorkoutDetailScreen() {
 
   if (detailQuery.isLoading) {
     return <LoadingScreen />;
+  }
+
+  if (detailQuery.isError) {
+    return (
+      <View style={styles.container}>
+        <ErrorState
+          message={detailQuery.error?.message}
+          onRetry={() => detailQuery.refetch()}
+        />
+      </View>
+    );
   }
 
   const workout = detailQuery.data;

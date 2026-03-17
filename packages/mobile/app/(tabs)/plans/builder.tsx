@@ -17,6 +17,7 @@ import { colors, spacing, borderRadius, typography } from "../../../src/theme";
 import { Button } from "../../../src/components/ui/Button";
 import { Card } from "../../../src/components/ui/Card";
 import { NumberInput } from "../../../src/components/ui/NumberInput";
+import { useToast } from "../../../src/components/ui/Toast";
 import { trpc } from "../../../src/api/trpc";
 import {
   DEFAULT_REST_SECONDS,
@@ -100,12 +101,18 @@ function AnimatedExerciseCard({
 export default function PlanBuilderScreen() {
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditing = !!editId;
+  const { showToast } = useToast();
 
   const [name, setName] = useState("");
   const [exercises, setExercises] = useState<PlanExerciseEntry[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Validation state
+  const [nameError, setNameError] = useState("");
+  const [exercisesError, setExercisesError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -144,10 +151,32 @@ export default function PlanBuilderScreen() {
     }
   }, [planQuery.data]);
 
+  const validateName = (value: string) => {
+    if (!value.trim()) {
+      setNameError("Plan name is required");
+      return false;
+    }
+    setNameError("");
+    return true;
+  };
+
+  const validateExercises = (list: PlanExerciseEntry[]) => {
+    if (list.length === 0) {
+      setExercisesError("Add at least one exercise");
+      return false;
+    }
+    setExercisesError("");
+    return true;
+  };
+
   const createMutation = trpc.plan.create.useMutation({
     onSuccess: () => {
       utils.plan.list.invalidate();
+      showToast("Plan created", "success");
       router.back();
+    },
+    onError: (err) => {
+      showToast(err.message || "Failed to create plan", "error");
     },
   });
 
@@ -155,13 +184,17 @@ export default function PlanBuilderScreen() {
     onSuccess: () => {
       utils.plan.list.invalidate();
       utils.plan.getById.invalidate({ id: editId! });
+      showToast("Plan updated", "success");
       router.back();
+    },
+    onError: (err) => {
+      showToast(err.message || "Failed to update plan", "error");
     },
   });
 
   const addExercise = (ex: any) => {
-    setExercises((prev) => [
-      ...prev,
+    const newExercises = [
+      ...exercises,
       {
         key: `${ex.id}-${Date.now()}`,
         exerciseId: ex.id,
@@ -171,14 +204,18 @@ export default function PlanBuilderScreen() {
         restSeconds: DEFAULT_REST_SECONDS,
         notes: "",
       },
-    ]);
+    ];
+    setExercises(newExercises);
+    if (submitted) validateExercises(newExercises);
     setShowExercisePicker(false);
     setExerciseSearch("");
     setSelectedCategory(null);
   };
 
   const removeExercise = (index: number) => {
-    setExercises((prev) => prev.filter((_, i) => i !== index));
+    const newExercises = exercises.filter((_, i) => i !== index);
+    setExercises(newExercises);
+    if (submitted) validateExercises(newExercises);
   };
 
   const moveExercise = (index: number, direction: "up" | "down") => {
@@ -202,14 +239,11 @@ export default function PlanBuilderScreen() {
   };
 
   const handleSave = () => {
-    if (!name.trim()) {
-      Alert.alert("Error", "Please enter a plan name");
-      return;
-    }
-    if (exercises.length === 0) {
-      Alert.alert("Error", "Please add at least one exercise");
-      return;
-    }
+    setSubmitted(true);
+    const nameValid = validateName(name);
+    const exercisesValid = validateExercises(exercises);
+
+    if (!nameValid || !exercisesValid) return;
 
     const exerciseInputs = exercises.map((e, i) => ({
       exerciseId: e.exerciseId,
@@ -249,17 +283,27 @@ export default function PlanBuilderScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Plan Name</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, nameError ? styles.inputError : null]}
             value={name}
-            onChangeText={setName}
+            onChangeText={(v) => {
+              setName(v);
+              if (submitted) validateName(v);
+            }}
+            onBlur={() => validateName(name)}
             placeholder="e.g., Push Day, Leg Day"
             placeholderTextColor={colors.textDisabled}
             maxLength={200}
           />
+          {nameError ? (
+            <Text style={styles.validationError}>{nameError}</Text>
+          ) : null}
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Exercises</Text>
+          {exercisesError ? (
+            <Text style={styles.validationError}>{exercisesError}</Text>
+          ) : null}
 
           {exercises.map((ex, index) => (
             <AnimatedExerciseCard key={ex.key} style={styles.exerciseEntry}>
@@ -500,6 +544,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     minHeight: 48,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  validationError: {
+    ...typography.caption,
+    color: colors.error,
   },
   section: {
     gap: spacing.sm,

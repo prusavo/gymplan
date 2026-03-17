@@ -52,6 +52,17 @@ export const gymPlanInstanceSchema = z.object({
   notes: z.string().nullable(),
 });
 
+export const workoutHistoryQuerySchema = z.object({
+  limit: z.number().int().min(1).max(100).default(20),
+  offset: z.number().int().min(0).default(0),
+});
+
+export const workoutGetByIdSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export type WorkoutHistoryQuery = z.infer<typeof workoutHistoryQuerySchema>;
+export type WorkoutGetByIdInput = z.infer<typeof workoutGetByIdSchema>;
 export type StartWorkoutInput = z.infer<typeof startWorkoutSchema>;
 export type LogSetInput = z.infer<typeof logSetSchema>;
 export type SkipSetInput = z.infer<typeof skipSetSchema>;

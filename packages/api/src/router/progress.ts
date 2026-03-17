@@ -1,4 +1,4 @@
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import {
   instanceHistoryQuerySchema,
   exerciseHistoryQuerySchema,
@@ -31,7 +31,7 @@ export const progressRouter = router({
         .where(
           and(
             eq(gymPlanInstance.userId, ctx.user.id),
-            eq(gymPlanInstance.status, "completed")
+            inArray(gymPlanInstance.status, ["completed", "abandoned"])
           )
         )
         .orderBy(desc(gymPlanInstance.completedAt))

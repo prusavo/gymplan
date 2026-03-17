@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, FlatList, StyleSheet } from "react-native";
+import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable } from "react-native";
@@ -7,6 +7,7 @@ import { colors, spacing, typography } from "../../../src/theme";
 import { Card } from "../../../src/components/ui/Card";
 import { LoadingScreen } from "../../../src/components/ui/LoadingScreen";
 import { EmptyState } from "../../../src/components/ui/EmptyState";
+import { ErrorState } from "../../../src/components/ui/ErrorState";
 import { trpc } from "../../../src/api/trpc";
 
 export default function PlanListScreen() {
@@ -15,6 +16,17 @@ export default function PlanListScreen() {
 
   if (plansQuery.isLoading && !plansQuery.data) {
     return <LoadingScreen />;
+  }
+
+  if (plansQuery.isError) {
+    return (
+      <View style={styles.container}>
+        <ErrorState
+          message={plansQuery.error?.message}
+          onRetry={() => plansQuery.refetch()}
+        />
+      </View>
+    );
   }
 
   return (
@@ -43,6 +55,14 @@ export default function PlanListScreen() {
         )}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={plansQuery.isRefetching}
+            onRefresh={() => plansQuery.refetch()}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListEmptyComponent={
           <EmptyState
             icon="clipboard-outline"

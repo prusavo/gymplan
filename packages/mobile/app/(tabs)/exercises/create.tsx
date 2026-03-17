@@ -13,17 +13,24 @@ import {
 import { router, useLocalSearchParams, Stack } from "expo-router";
 import { colors, spacing, borderRadius, typography } from "../../../src/theme";
 import { Button } from "../../../src/components/ui/Button";
+import { useToast } from "../../../src/components/ui/Toast";
 import { trpc } from "../../../src/api/trpc";
 
 export default function CreateExerciseScreen() {
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditing = !!editId;
+  const { showToast } = useToast();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [categoryName, setCategoryName] = useState<string>("");
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+
+  // Validation state
+  const [nameError, setNameError] = useState("");
+  const [categoryError, setCategoryError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   const utils = trpc.useUtils();
   const categoriesQuery = trpc.category.list.useQuery();
@@ -44,32 +51,54 @@ export default function CreateExerciseScreen() {
     }
   }, [exerciseQuery.data]);
 
+  // Validate on blur or when submitted
+  const validateName = (value: string) => {
+    if (!value.trim()) {
+      setNameError("Exercise name is required");
+      return false;
+    }
+    setNameError("");
+    return true;
+  };
+
+  const validateCategory = (value: string) => {
+    if (!value) {
+      setCategoryError("Please select a category");
+      return false;
+    }
+    setCategoryError("");
+    return true;
+  };
+
   const createMutation = trpc.exercise.create.useMutation({
     onSuccess: () => {
       utils.exercise.list.invalidate();
+      showToast("Exercise created", "success");
       router.back();
     },
-    onError: (err) => Alert.alert("Error", err.message),
+    onError: (err) => {
+      showToast(err.message || "Failed to create exercise", "error");
+    },
   });
 
   const updateMutation = trpc.exercise.update.useMutation({
     onSuccess: () => {
       utils.exercise.list.invalidate();
       utils.exercise.getById.invalidate({ id: editId! });
+      showToast("Exercise updated", "success");
       router.back();
     },
-    onError: (err) => Alert.alert("Error", err.message),
+    onError: (err) => {
+      showToast(err.message || "Failed to update exercise", "error");
+    },
   });
 
   const handleSave = () => {
-    if (!name.trim()) {
-      Alert.alert("Error", "Please enter an exercise name");
-      return;
-    }
-    if (!categoryId) {
-      Alert.alert("Error", "Please select a category");
-      return;
-    }
+    setSubmitted(true);
+    const nameValid = validateName(name);
+    const categoryValid = validateCategory(categoryId);
+
+    if (!nameValid || !categoryValid) return;
 
     if (isEditing) {
       updateMutation.mutate({
@@ -102,19 +131,26 @@ export default function CreateExerciseScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Name</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, nameError ? styles.inputError : null]}
             value={name}
-            onChangeText={setName}
+            onChangeText={(v) => {
+              setName(v);
+              if (submitted) validateName(v);
+            }}
+            onBlur={() => validateName(name)}
             placeholder="Exercise name"
             placeholderTextColor={colors.textDisabled}
             maxLength={200}
           />
+          {nameError ? (
+            <Text style={styles.errorText}>{nameError}</Text>
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Category</Text>
           <Pressable
-            style={styles.input}
+            style={[styles.input, categoryError ? styles.inputError : null]}
             onPress={() => setShowCategoryPicker(true)}
           >
             <Text
@@ -126,6 +162,9 @@ export default function CreateExerciseScreen() {
               {categoryName || "Select a category"}
             </Text>
           </Pressable>
+          {categoryError ? (
+            <Text style={styles.errorText}>{categoryError}</Text>
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>
@@ -176,6 +215,7 @@ export default function CreateExerciseScreen() {
                       setCategoryId(item.id);
                       setCategoryName(item.name);
                       setShowCategoryPicker(false);
+                      if (submitted) validateCategory(item.id);
                     }}
                   >
                     <Text
@@ -223,6 +263,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 48,
     justifyContent: "center",
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.error,
   },
   pickerText: {
     color: colors.text,

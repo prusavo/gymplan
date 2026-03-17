@@ -13,6 +13,7 @@ export default function HistoryLayout() {
       <Stack.Screen name="index" options={{ title: "History" }} />
       <Stack.Screen name="[id]" options={{ title: "Workout Detail" }} />
       <Stack.Screen name="progress" options={{ title: "Progress" }} />
+      <Stack.Screen name="records" options={{ title: "Personal Records" }} />
     </Stack>
   );
 }

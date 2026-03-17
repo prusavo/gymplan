@@ -1,11 +1,12 @@
 import React from "react";
-import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
+import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, borderRadius, typography } from "../../../src/theme";
 import { Card } from "../../../src/components/ui/Card";
 import { LoadingScreen } from "../../../src/components/ui/LoadingScreen";
 import { EmptyState } from "../../../src/components/ui/EmptyState";
+import { ErrorState } from "../../../src/components/ui/ErrorState";
 import { trpc } from "../../../src/api/trpc";
 
 export default function HistoryListScreen() {
@@ -18,6 +19,17 @@ export default function HistoryListScreen() {
 
   if (historyQuery.isLoading && !historyQuery.data) {
     return <LoadingScreen />;
+  }
+
+  if (historyQuery.isError) {
+    return (
+      <View style={styles.container}>
+        <ErrorState
+          message={historyQuery.error?.message}
+          onRetry={() => historyQuery.refetch()}
+        />
+      </View>
+    );
   }
 
   const formatDate = (dateStr: string) => {
@@ -46,6 +58,17 @@ export default function HistoryListScreen() {
       >
         <Ionicons name="trending-up" size={20} color={colors.primary} />
         <Text style={styles.progressLinkText}>View Progress Charts</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textDisabled} />
+      </Pressable>
+
+      <Pressable
+        style={styles.progressLink}
+        onPress={() => router.push("/(tabs)/history/records")}
+      >
+        <Ionicons name="trophy-outline" size={20} color={colors.secondary} />
+        <Text style={[styles.progressLinkText, { color: colors.secondary }]}>
+          Personal Records
+        </Text>
         <Ionicons name="chevron-forward" size={16} color={colors.textDisabled} />
       </Pressable>
 
@@ -105,6 +128,14 @@ export default function HistoryListScreen() {
         )}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={historyQuery.isRefetching}
+            onRefresh={() => historyQuery.refetch()}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListEmptyComponent={
           <EmptyState
             icon="time-outline"

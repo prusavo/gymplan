@@ -17,6 +17,7 @@ import { colors, spacing, borderRadius, typography } from "../../../src/theme";
 import { Button } from "../../../src/components/ui/Button";
 import { NumberInput } from "../../../src/components/ui/NumberInput";
 import { CountdownTimer } from "../../../src/components/ui/CountdownTimer";
+import { useToast } from "../../../src/components/ui/Toast";
 import { useWorkoutStore } from "../../../src/stores/workoutStore";
 import { useCountdownTimer } from "../../../src/hooks/useCountdownTimer";
 import { trpc } from "../../../src/api/trpc";
@@ -30,6 +31,7 @@ export default function ActiveWorkoutScreen() {
   const { secondsLeft, isActive: timerActive } = useCountdownTimer(
     store.restEndTime
   );
+  const { showToast } = useToast();
 
   const [weightKg, setWeightKg] = useState(0);
   const [reps, setReps] = useState(10);
@@ -193,6 +195,7 @@ export default function ActiveWorkoutScreen() {
       await completeMutation.mutateAsync({
         instanceId: store.activeInstanceId,
       });
+      showToast("Workout completed!", "success");
     } catch {
       // Continue
     }
@@ -215,6 +218,7 @@ export default function ActiveWorkoutScreen() {
               await abandonMutation.mutateAsync({
                 instanceId: store.activeInstanceId,
               });
+              showToast("Workout abandoned", "success");
             } catch {
               // Continue
             }

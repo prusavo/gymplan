@@ -1,11 +1,13 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import {
   startWorkoutSchema,
   logSetSchema,
   skipSetSchema,
   completeWorkoutSchema,
   abandonWorkoutSchema,
+  workoutHistoryQuerySchema,
+  workoutGetByIdSchema,
 } from "@gymplan/shared";
 import { router, protectedProcedure } from "../middleware/auth.js";
 import {
@@ -242,6 +244,126 @@ export const workoutRouter = router({
         .returning();
 
       return updated;
+    }),
+
+  history: protectedProcedure
+    .input(workoutHistoryQuerySchema)
+    .query(async ({ ctx, input }) => {
+      const instances = await ctx.db
+        .select({
+          id: gymPlanInstance.id,
+          gymPlanId: gymPlanInstance.gymPlanId,
+          status: gymPlanInstance.status,
+          startedAt: gymPlanInstance.startedAt,
+          completedAt: gymPlanInstance.completedAt,
+          notes: gymPlanInstance.notes,
+          planName: gymPlan.name,
+        })
+        .from(gymPlanInstance)
+        .leftJoin(gymPlan, eq(gymPlanInstance.gymPlanId, gymPlan.id))
+        .where(
+          and(
+            eq(gymPlanInstance.userId, ctx.user.id),
+            inArray(gymPlanInstance.status, ["completed", "abandoned"])
+          )
+        )
+        .orderBy(desc(gymPlanInstance.completedAt))
+        .limit(input.limit)
+        .offset(input.offset);
+
+      // Fetch volume and set counts for all returned instances
+      const instanceIds = instances.map((i) => i.id);
+
+      if (instanceIds.length === 0) {
+        return { instances: [] };
+      }
+
+      const setStats = await ctx.db
+        .select({
+          gymPlanInstanceId: instanceSet.gymPlanInstanceId,
+          totalVolume:
+            sql<string | null>`SUM(CAST(${instanceSet.weightKg} AS NUMERIC) * ${instanceSet.repsCompleted})`.as(
+              "total_volume"
+            ),
+          totalSets: sql<number>`COUNT(*)::int`.as("total_sets"),
+        })
+        .from(instanceSet)
+        .where(
+          and(
+            inArray(instanceSet.gymPlanInstanceId, instanceIds),
+            eq(instanceSet.skipped, false)
+          )
+        )
+        .groupBy(instanceSet.gymPlanInstanceId);
+
+      const statsMap = new Map(
+        setStats.map((s) => [s.gymPlanInstanceId, s])
+      );
+
+      return {
+        instances: instances.map((inst) => {
+          const stats = statsMap.get(inst.id);
+          return {
+            ...inst,
+            totalVolume: stats?.totalVolume ? Number(stats.totalVolume) : 0,
+            totalSets: stats?.totalSets ?? 0,
+          };
+        }),
+      };
+    }),
+
+  getById: protectedProcedure
+    .input(workoutGetByIdSchema)
+    .query(async ({ ctx, input }) => {
+      const [instance] = await ctx.db
+        .select({
+          id: gymPlanInstance.id,
+          gymPlanId: gymPlanInstance.gymPlanId,
+          status: gymPlanInstance.status,
+          startedAt: gymPlanInstance.startedAt,
+          completedAt: gymPlanInstance.completedAt,
+          notes: gymPlanInstance.notes,
+          planName: gymPlan.name,
+        })
+        .from(gymPlanInstance)
+        .leftJoin(gymPlan, eq(gymPlanInstance.gymPlanId, gymPlan.id))
+        .where(
+          and(
+            eq(gymPlanInstance.id, input.id),
+            eq(gymPlanInstance.userId, ctx.user.id)
+          )
+        )
+        .limit(1);
+
+      if (!instance) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workout instance not found",
+        });
+      }
+
+      const sets = await ctx.db
+        .select({
+          id: instanceSet.id,
+          gymPlanExerciseId: instanceSet.gymPlanExerciseId,
+          exerciseName: exercise.name,
+          setNumber: instanceSet.setNumber,
+          weightKg: instanceSet.weightKg,
+          repsCompleted: instanceSet.repsCompleted,
+          skipped: instanceSet.skipped,
+          notes: instanceSet.notes,
+          completedAt: instanceSet.completedAt,
+        })
+        .from(instanceSet)
+        .leftJoin(
+          gymPlanExercise,
+          eq(instanceSet.gymPlanExerciseId, gymPlanExercise.id)
+        )
+        .leftJoin(exercise, eq(gymPlanExercise.exerciseId, exercise.id))
+        .where(eq(instanceSet.gymPlanInstanceId, instance.id))
+        .orderBy(instanceSet.gymPlanExerciseId, instanceSet.setNumber);
+
+      return { ...instance, sets };
     }),
 
   getActive: protectedProcedure.query(async ({ ctx }) => {

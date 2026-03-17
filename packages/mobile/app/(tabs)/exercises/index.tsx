@@ -16,6 +16,7 @@ import { colors, spacing, borderRadius, typography } from "../../../src/theme";
 import { Card } from "../../../src/components/ui/Card";
 import { LoadingScreen } from "../../../src/components/ui/LoadingScreen";
 import { EmptyState } from "../../../src/components/ui/EmptyState";
+import { ErrorState } from "../../../src/components/ui/ErrorState";
 import { trpc } from "../../../src/api/trpc";
 
 const PAGE_SIZE = 30;
@@ -68,6 +69,17 @@ export default function ExerciseListScreen() {
 
   if (exercisesQuery.isLoading && !exercisesQuery.data) {
     return <LoadingScreen />;
+  }
+
+  if (exercisesQuery.isError) {
+    return (
+      <View style={styles.container}>
+        <ErrorState
+          message={exercisesQuery.error?.message}
+          onRetry={() => exercisesQuery.refetch()}
+        />
+      </View>
+    );
   }
 
   return (
